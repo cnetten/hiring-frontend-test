@@ -2,13 +2,14 @@ import React, { Component } from "react";
 import ReactDOM from "react-dom";
 import Highcharts from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
-
+import moment from 'moment';
 class Test extends Component {
 
   constructor() {
     super();
 
     this.state = {
+        dateArray: [],
         options: [],
           error: null,
           isLoaded: false,
@@ -16,19 +17,31 @@ class Test extends Component {
 
   }
   
-  componentDidMount() {
-    
-    var $ = this;
 
-      Promise.all([
-        fetch('https://stage.altrac-api.com/evapo/address/26002e000c51343334363138?date=2020-07-27&tzOffset=-7&elevation=160.9&latitude=43.2624613&Kc=0.51'),
-        fetch('https://stage.altrac-api.com/evapo/address/26002e000c51343334363138?date=2020-07-28&tzOffset=-7&elevation=160.9&latitude=43.2624613&Kc=0.51'),
-        fetch('https://stage.altrac-api.com/evapo/address/26002e000c51343334363138?date=2020-07-29&tzOffset=-7&elevation=160.9&latitude=43.2624613&Kc=0.51')
-    ]).then(function (responses) {
-        return Promise.all(responses.map(function (response) {
-            return response.json();
-        }));
-    }).then(function (result) {
+
+
+  componentDidMount() {
+    var $ = this;
+    var today = new Date();
+    var yesterday = new Date(today.setDate(today.getDate() - 1))
+    var weekTemp  = new Date(yesterday);
+    var week = weekTemp.setDate(weekTemp.getDate() - 6);
+
+    var DateArray = [];
+    var currentDate = moment(week);
+    var stopDate = moment(yesterday);
+    while (currentDate <= stopDate) {
+        DateArray.push( moment(currentDate).format('YYYY-MM-DD') )
+        currentDate = moment(currentDate).add(1, 'days');     
+    }
+    var promiseArray = []
+    
+    DateArray.forEach(function(date) {
+        promiseArray.push('https://stage.altrac-api.com/evapo/address/26002e000c51343334363138?date='+ date +'&tzOffset=-7&elevation=160.9&latitude=43.2624613&Kc=0.51')
+    });
+      Promise.all(promiseArray.map(u=>fetch(u))).then(responses =>
+        Promise.all(responses.map(res => res.json()))
+    ).then(function (result) {
 
         var temp = [];
         var sol = [];
@@ -39,6 +52,8 @@ class Test extends Component {
             sol.push(result[i].meanSolarRadiationMJ);
             eva.push(result[i].evapotranspirationIN);
         }
+
+        var startPoint = new Date(week);
 
       $.setState({
         isLoaded: true,
@@ -96,7 +111,7 @@ class Test extends Component {
                 { 
                     name: 'Temperature (C)',
                     data: temp  ,
-                    pointStart: Date.UTC(2020, 6, 27),
+                    pointStart:  Date.UTC(startPoint.getUTCFullYear(), startPoint.getUTCMonth(), startPoint.getUTCDate()),
                     pointInterval: 24 * 36e5,
                     yAxis: 0,
                     tooltip: {
@@ -108,14 +123,14 @@ class Test extends Component {
                 {
                     name: 'Solar (MJ)',
                     data: sol,
-                    pointStart: Date.UTC(2020, 6, 27),
+                    pointStart:  Date.UTC(startPoint.getUTCFullYear(), startPoint.getUTCMonth(), startPoint.getUTCDate()),
                     pointInterval: 24 * 36e5,
                     yAxis: 0
                 },
                 {
                     name: 'Evapo (In)',
                     data: eva,
-                    pointStart: Date.UTC(2020, 6, 27),
+                    pointStart:  Date.UTC(startPoint.getUTCFullYear(), startPoint.getUTCMonth(), startPoint.getUTCDate()),
                     pointInterval: 24 * 36e5,
                     yAxis: 1,
                     tooltip: {
@@ -127,6 +142,7 @@ class Test extends Component {
     });
 
     }).catch(function (error) {
+
         $.setState({
             isLoaded: true,
             error: error
